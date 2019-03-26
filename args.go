@@ -10,6 +10,7 @@ import (
 )
 
 type Args struct {
+	host    string
 	input   string
 	output  string
 	sep     string

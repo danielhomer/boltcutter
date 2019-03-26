@@ -5,18 +5,18 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
+	"net/http"
 	"os"
 	"sync"
-	"time"
 )
 
 func main() {
 	args := Args{}
 
+	flag.StringVar(&args.host,"host", "", "The hostname to prefix relative from paths with")
 	flag.StringVar(&args.input,"input", "./input.txt", "The path to the input file")
 	flag.StringVar(&args.output, "output", "./output.txt", "The path the output file")
-	flag.StringVar(&args.sep, "sep", ",", "The separator between the source and destination in the input file")
+	flag.StringVar(&args.sep, "sep", " ", "The separator between the source and destination in the input file")
 	flag.IntVar(&args.threads, "threads", 4, "Number of links to trace at once")
 
 	flag.Parse()
@@ -58,26 +58,26 @@ func process(a *Args) (err error) {
 		return err
 	}
 
-	var wg sync.WaitGroup
-	queue := make(chan string)
-	done := make(chan string)
+	wg := sync.WaitGroup{}
+	queue := make(chan Line)
+	out := make(chan Line)
 
 	// Spawn some workers
 	for i := 0; i < a.threads; i++ {
 		wg.Add(1)
-		go worker(&wg, queue, done, i)
+		go worker(&wg, queue, out, i)
 	}
 
 	go func() {
 		for _, line := range lines {
-			queue <- line.raw
+			queue <- line
 		}
 		close(queue)
 	}()
 
 	go func() {
-		for l := range done {
-			fmt.Println(l)
+		for l := range out {
+			fmt.Println(l.from, l.to)
 		}
 	}()
 
@@ -86,11 +86,33 @@ func process(a *Args) (err error) {
 	return nil
 }
 
-func worker(wg *sync.WaitGroup, queue chan string, done chan<- string, id int) {
-	for p := range queue {
-		time.Sleep(time.Millisecond * time.Duration(rand.Intn(1)))
-		//fmt.Printf("[Worker %v] processing %s\n", id, p)
-		done <- p
+func worker(wg *sync.WaitGroup, queue <-chan Line, out chan<- Line, id int) {
+	for l := range queue {
+		myURL := "https://" + l.args.host + "/" + l.from
+		nextURL := myURL
+		var i int
+		for i < 100 {
+			client := &http.Client{
+				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+					return http.ErrUseLastResponse
+				} }
+
+			resp, err := client.Get(nextURL)
+
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			if resp.StatusCode == 200 {
+				break
+			} else {
+				out <- Line{
+					from: myURL,
+					to: resp.Header.Get("Location"),
+				}
+				i += 1
+			}
+		}
 	}
 
 	wg.Done()
