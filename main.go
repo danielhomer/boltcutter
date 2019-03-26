@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 )
 
 func main() {
@@ -16,13 +17,8 @@ func main() {
 	flag.StringVar(&args.sep, "sep", ",", "The separator between the source and destination in the input file")
 
 	flag.Parse()
-
 	args.Parse()
 	args.Validate()
-
-	fmt.Println("Input:", args.input)
-	fmt.Println("Output:", args.output)
-	fmt.Println("Separator:", args.sep)
 
 	if err := process(&args); err != nil {
 		log.Fatal(err)
@@ -41,13 +37,43 @@ func process(a *Args) (err error) {
 		return err
 	}
 
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		fmt.Println(s.Text())
+	var lines []Line
+	var wg sync.WaitGroup
+	res := make(chan Line)
+
+	defer wg.Wait()
+
+	scanner := bufio.NewScanner(f)
+
+	for scanner.Scan() {
+		l := Line{
+			raw: scanner.Text(),
+			args: a,
+		}
+		if err := l.Parse(); err != nil {
+			continue // Maybe debug log here for parse errors?
+		}
+
+		lines = append(lines, l)
 	}
-	if err := s.Err(); err != nil {
+	if err := scanner.Err(); err != nil {
 		return err
 	}
+
+	wg.Add(len(lines))
+
+	for _, line := range lines {
+		go func() {
+			defer wg.Done()
+			res <- line
+		}()
+	}
+
+	go func() {
+		for line := range res {
+			fmt.Println(line.raw)
+		}
+	}()
 
 	return nil
 }

@@ -16,7 +16,7 @@ type Args struct {
 }
 
 type ValidationSettings struct {
-	name string
+	name      string
 	notExists bool
 }
 
