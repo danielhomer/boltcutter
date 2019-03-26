@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -39,10 +41,6 @@ func process(a *Args) (err error) {
 	}
 
 	var lines []Line
-	queue := make(chan string)
-	done := make(chan string)
-	kill := make(chan bool)
-
 	scanner := bufio.NewScanner(f)
 
 	for scanner.Scan() {
@@ -60,30 +58,40 @@ func process(a *Args) (err error) {
 		return err
 	}
 
+	var wg sync.WaitGroup
+	queue := make(chan string)
+	done := make(chan string)
 
+	// Spawn some workers
 	for i := 0; i < a.threads; i++ {
-		go worker(queue, i, done, kill)
+		wg.Add(1)
+		go worker(&wg, queue, done, i)
 	}
 
-	for _, line := range lines {
-		go func() {
-			queue <- line.from
-		}()
-	}
-	//close(queue)
+	go func() {
+		for _, line := range lines {
+			queue <- line.raw
+		}
+		close(queue)
+	}()
 
-	for l := range done {
-		fmt.Println(l)
-	}
+	go func() {
+		for l := range done {
+			fmt.Println(l)
+		}
+	}()
+
+	wg.Wait()
 
 	return nil
 }
 
-func worker(queue chan string, no int, done chan string, kill chan bool) {
-	for l := range queue {
-		fmt.Println("worker", no, "started  job", l)
-		time.Sleep(time.Second)
-		fmt.Println("worker", no, "finished job", l)
-		done <- l
+func worker(wg *sync.WaitGroup, queue chan string, done chan<- string, id int) {
+	for p := range queue {
+		time.Sleep(time.Millisecond * time.Duration(rand.Intn(1)))
+		//fmt.Printf("[Worker %v] processing %s\n", id, p)
+		done <- p
 	}
+
+	wg.Done()
 }
