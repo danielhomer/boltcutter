@@ -1,10 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 )
 
 func main() {
@@ -21,20 +22,32 @@ func main() {
 
 	fmt.Println("Input:", args.input)
 	fmt.Println("Output:", args.output)
-	fmt.Println("Seperator:", args.sep)
+	fmt.Println("Separator:", args.sep)
 
-	if err := process(args.input, args.output, args.sep); err != nil {
+	if err := process(&args); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func process(input string, output string, sep string) error {
-	data, err := ioutil.ReadFile(input)
+func process(a *Args) (err error) {
+	f, err := os.Open(a.input)
+	defer func () {
+		fileErr := f.Close()
+		if err != nil {
+			err = fileErr
+		}
+	}()
 	if err != nil {
 		return err
 	}
 
-	fmt.Print(string(data))
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		fmt.Println(s.Text())
+	}
+	if err := s.Err(); err != nil {
+		return err
+	}
 
 	return nil
 }
