@@ -10,9 +10,10 @@ import (
 )
 
 type Args struct {
-	input  string
-	output string
-	sep    string
+	input   string
+	output  string
+	sep     string
+	threads int
 }
 
 type ValidationSettings struct {
