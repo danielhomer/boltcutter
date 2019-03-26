@@ -88,7 +88,7 @@ func process(a *Args) (err error) {
 
 func worker(wg *sync.WaitGroup, queue <-chan Line, out chan<- Line, id int) {
 	for l := range queue {
-		myURL := "https://" + l.args.host + "/" + l.from
+		myURL := "https://" + l.args.host + l.from
 		nextURL := myURL
 		var i int
 		for i < 100 {
@@ -101,6 +101,7 @@ func worker(wg *sync.WaitGroup, queue <-chan Line, out chan<- Line, id int) {
 
 			if err != nil {
 				fmt.Println(err)
+				break; // Fix this!
 			}
 
 			if resp.StatusCode == 200 {
@@ -110,6 +111,7 @@ func worker(wg *sync.WaitGroup, queue <-chan Line, out chan<- Line, id int) {
 					from: myURL,
 					to: resp.Header.Get("Location"),
 				}
+				nextURL = resp.Header.Get("Location")
 				i += 1
 			}
 		}
