@@ -9,14 +9,15 @@ import (
 	"strings"
 )
 
-
-const ValidateInput = 1
-const ValidateOutput = 0
-
 type Args struct {
 	input  string
 	output string
 	sep    string
+}
+
+type ValidationSettings struct {
+	name string
+	notExists bool
 }
 
 func (a *Args) Parse() {
@@ -34,11 +35,17 @@ func (a *Args) Parse() {
 }
 
 func (a *Args) Validate() {
-	if err := a.validatePath(a.input, ValidateInput); err != nil {
+	if err := a.validatePath(a.input, ValidationSettings{
+		name: "Input",
+		notExists: true,
+	}); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := a.validatePath(a.output, ValidateOutput); err != nil {
+	if err := a.validatePath(a.output, ValidationSettings{
+		name: "Output",
+		notExists: false,
+	}); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -55,19 +62,19 @@ func (a Args) expandHomeDir(path string) (string, error) {
 	return path, nil
 }
 
-func (a Args) validatePath(path string, mode int) error {
+func (a Args) validatePath(path string, settings ValidationSettings) error {
 	info, err := os.Stat(path)
 
 	if os.IsNotExist(err) {
-		if mode == ValidateInput {
-			return errors.New(fmt.Sprintf("Input: %s doesn't exist", path) )
+		if settings.notExists {
+			return errors.New(fmt.Sprintf("%s: %s doesn't exist", settings.name, path))
 		} else {
 			return nil
 		}
 	}
 
 	if info.IsDir() {
-		return errors.New(fmt.Sprintf("Input: %s is a directory", path))
+		return errors.New(fmt.Sprintf("%s: %s is a directory", settings.name, path))
 	}
 
 	return nil
